@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>GitViz</title>
+	<script src="./d3.v4.min.js"></script>
+</head>
+<style>
+.ctx{
+	width: 80%;
+	margin:0 auto;
+}
+.head{
+	margin:0 auto;
+	font-size: 40px;
+	text-align: center;
+}
+.search{
+	margin:0 auto;
+	text-align: center;
+}
+input[type=text], select {
+    width: 60%;
+    padding: 12px 20px;
+    margin: 8px 0;
+    display: inline-block;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+input[type=submit] {
+    width: 60%;
+    background-color: #4CAF50;
+    color: white;
+    padding: 14px 20px;
+    margin: 8px 0;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+input[type=submit]:hover {
+    background-color: #45a049;
+}
+.output{
+	margin:0 auto;
+	text-align: center;
+}
+.axis .domain {
+  display: none;
+}
+.toolTip {
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    position: absolute;
+    display: none;
+    width: auto;
+    height: auto;
+    background: none repeat scroll 0 0 white;
+    border: 0 none;
+    border-radius: 8px 8px 8px 8px;
+    box-shadow: -3px 3px 15px #888888;
+    color: black;
+    font: 12px sans-serif;
+    padding: 5px;
+    text-align: center;
+}
+.arc text {
+  font: 10px sans-serif;
+  text-anchor: middle;
+}
+
+.arc path {
+  stroke: #fff;
+}
+.header{
+	margin:0 auto;
+	font-size: 30px;
+	line-height: 60px;
+	text-align: center;
+}
+</style>
+<body>
+	<div class='ctx'>
+		<div class='head'>
+			GITVIZ
+		</div>
+		<div class='search'>
+			<input type="text" name="url" id='text'>
+			<input type="submit" value="Search" id='searchBtn'>
+		</div>
+	</div>
+	<div class='header' id='object1_header'></div>
+	<div class='output' id="object1">
+		
+	</div>
+	<div class='header' id='object2_header'></div>
+	<div class='output' id="object2">
+		
+	</div>
+	<div class='header' id='object3_header'></div>
+	<div class='output' id="object3">
+		
+	</div>
+</body>
+
+<script type="text/javascript">
+function copyArray(arr){
+	let res = new Array();
+	for(let a in arr){
+		res.push(arr[a]);
+	}
+	return res;
+}
+function drawObjectiveOne(data){
+	// data prepocessing
+	let data_owner = copyArray(data['owner']);
+  	let max_owner = 0;
+  	let data_non = new Array();
+	for(d in data['all']){
+		data_non.push(data['all'][d]-data['owner'][d]);
+		if(data['owner'][d]>max_owner){
+			max_owner = data['owner'][d];
+		}
+	}
+	data_owner = data_owner.reverse();
+	data_non = data_non.reverse();
+
+	let svg = d3.select("#object1")
+				.append("svg")
+				.attr("width",1100)
+				.attr("height",800),
+    	margin = {top: 20, right: 80, bottom: 20, left: 80},
+    	width = +svg.attr("width") - margin.left - margin.right,
+    	height = +svg.attr("height") - margin.top - margin.bottom,
+    	g = svg.append("g").attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+    let middle = 60
+    let y = d3.scaleBand().rangeRound([0, height]).paddingInner(0.1); // location of each bar's y axis
+  	let x1 = d3.scaleLinear().rangeRound([0,width/2-middle/2]); // length of each left-bar
+  	let x2 = d3.scaleLinear().rangeRound([width/2-middle/2,0]); // prepare for the left-X-axis
+  	let x3 = d3.scaleLinear().rangeRound([0,width/2-middle/2]); // length of each right-bar
+
+  	y.domain(data_owner.map(function(d,i) { return i; }));
+	x1.domain([0, d3.max(data_owner, function(d) { return d})]).nice();
+	if(max_owner==0){
+		x2.domain([0, 100]).nice();
+	}else{
+		x2.domain([0, max_owner]).nice();
+	} // if all the owner's data is zero it can also display the left-X-axis
+	x3.domain([0, d3.max(data_non, function(d) { return d})]).nice();
+
+	// add the left bar chart
+	d_o = g.append("g")
+	.selectAll("g")
+	.data(data_owner)
+	.enter().append("g")
+	d_o.append("rect")
+	  // in order to control the mouseover animation we need to set the specific id
+	  .attr("id", function(d,i) { return "bar" + i; })
+	  .attr("class", "owner")
+	  .attr("x", function(d) { return width/2-middle/2-x1(d); })
+	  .attr("y", function(d,i) { return y(i); })
+	  .attr("height", y.bandwidth())
+	  .attr("width", function(d) { return 0; })
+	  .attr("fill", "#FFEEB8")
+	  // in order to show the animation at the left side we need to rotate all bars by 180 degrees
+	  .attr("transform", function(d,i){ return "rotate(180,"+(width/2-middle/2-x1(d)/2) + "," + (y(i)+y.bandwidth()/2) + ")"})
+	  .on("mouseover", function(d) {
+	  	idstr = this.id
+        d3.selectAll("#"+idstr).style("fill", "#FF3333");
+        idstrchange = idstr.replace("bar","text")
+        d3.selectAll("."+idstrchange).attr("display","block")
+      })
+      .on("mouseout", function(d) {
+      	idstr = this.id
+      	d3.selectAll("#"+idstr).filter(".owner").style("fill", "#FFEEB8");
+        d3.selectAll("#"+idstr).filter(".non").style("fill", "#C2D1FF");
+        idstrchange = idstr.replace("bar","text")
+        d3.selectAll("."+idstrchange).attr("display","none")
+      });
+
+    // add the left bar label(the number of each bar)
+	d_o.append("text")
+	  .attr("class", function(d,i) { return "text" + i; })
+      .attr("x", function(d) { return width/2-middle/2-x1(d)-5;})
+      .attr("y", function(d,i) { return y(i)+11; })
+      .attr("fill", "black")
+      .attr("text-anchor", "end")
+      .attr("font-size", "12px")
+      .attr("display", "none")
+      .text(function(d) { return d; })
+
+    // add the right bar chart
+	d_n = g.append("g")
+	.selectAll("g")
+	.data(data_non)
+	.enter().append("g")
+	d_n.append("rect")
+	  // in order to control the mouseover animation we need to set the specific id
+	  .attr("id", function(d,i) { return "bar" + i; })
+	  .attr("class", "non")
+	  .attr("x", function(d) { return width/2+middle/2; })
+	  .attr("y", function(d,i) { return y(i); })
+	  .attr("height", y.bandwidth())
+	  .attr("width", function(d) { return 0; })
+	  .attr("fill", "#C2D1FF")
+	  .on("mouseover", function(d) {
+	  	idstr = this.id
+        d3.selectAll("#"+idstr).style("fill", "#FF3333");
+        idstrchange = idstr.replace("bar","text")
+        d3.selectAll("."+idstrchange).attr("display","block")
+      })
+      .on("mouseout", function(d) {
+      	idstr = this.id
+      	d3.selectAll("#"+idstr).filter(".owner").style("fill", "#FFEEB8");
+        d3.selectAll("#"+idstr).filter(".non").style("fill", "#C2D1FF");
+        idstrchange = idstr.replace("bar","text")
+        d3.selectAll("."+idstrchange).attr("display","none")
+      });
+
+    // add the right bar label(the number of each bar)
+	d_n.append("text")
+	  .attr("class", function(d,i) { return "text" + i; })
+      .attr("x", function(d) { return width/2+middle/2+x3(d)+5;})
+      .attr("y", function(d,i) { return y(i)+11; })
+      .attr("fill", "black")
+      .attr("text-anchor", "start")
+      .attr("font-size", "12px")
+      .attr("display", "none")
+      .text(function(d) { return d; })
+
+    // animation of the left-bar-chart
+    g.selectAll("rect.owner")
+	    .data(data_owner)
+	    .transition()
+	    .duration(1000)
+	    .attr("width",function(d) { return x1(d); });
+	// animation of the right-bar-chart
+	g.selectAll("rect.non")
+	    .data(data_non)
+	    .transition()
+	    .duration(1000)
+	    .attr("width",function(d) { return x3(d); });
+
+	// add the middle y-axis
+	g.append("g")
+	  .attr("transform", function(d) { return "translate(0,11)"; })
+      .selectAll("text.week")
+      .data(d3.range(52))
+      .enter()
+      .append("text")
+      .attr("class", "week")
+      .attr("x", width/2)
+      .attr("y", function(d) { return y(d); })
+      .attr("fill", "black")
+      .attr("text-anchor", "middle")
+      .attr("font-size", "12px")
+      .text(function(d) { return "week "+(d+1); });
+    // add the x-axis of left-bar-chart
+	g.append("g")
+	  .attr("class", "axis")
+	  .attr("transform", "translate(0," + height + ")")
+	  .call(d3.axisBottom(x2))
+	// add the x-axis of right-bar-chart
+	g.append("g")
+	  .attr("class", "axis")
+	  .attr("transform", "translate("+ (width/2+middle/2) + "," + height + ")")
+	  .call(d3.axisBottom(x3))
+
+	// add the title of right-bar-chart
+	g.append("text")
+	  .attr("x", width/2-middle/2)
+	  .attr("y", -10)
+	  .attr("dy", ".71em")
+	  .attr("fill", "black")
+	  .attr("text-anchor", "end")
+	  .attr("font-size", "25px")
+	  .attr("font-variant", "small-caps")
+	  .attr("letter-spacing", 1)
+	  .text("repository owner");
+	// add the title of left-bar-chart
+	g.append("text")
+	  .attr("x", width/2 + middle/2)
+	  .attr("y", -10)
+	  .attr("dy", ".71em")
+	  .attr("fill", "black")
+	  .attr("text-anchor", "start")
+	  .attr("font-size", "25px")
+	  .attr("font-variant", "small-caps")
+	  .attr("letter-spacing", 1)
+	  .text("non-repository owners");
+
+}
+
+function getDay(index){
+	switch(index){
+		case 0:
+		return "Sunday";
+		case 1:
+		return "Monday";
+		case 2:
+		return "Tuesday";
+		case 3:
+		return "Wednesday";
+		case 4:
+		return "Thursday";
+		case 5:
+		return "Friday";
+		case 6:
+		return "Saturday";
+		default:
+		return "Undefined";
+	}
+}
+
+function drawObjectiveTwo(data,maxValue){
+	let svg = d3.select("#object2").append("svg")
+				.attr("width",1100)
+				.attr("height",300),
+    	margin = {top: 50, right: 80, bottom: 20, left: 80},
+    	width = +svg.attr("width") - margin.left - margin.right,
+    	height = +svg.attr("height") - margin.top - margin.bottom,
+    	g = svg.append("g").attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+    let legendLength = height
+    let x = d3.scaleBand().rangeRound([0, width]).paddingInner(0.1); // location of each rectangle's x-axis
+    let y = d3.scaleBand().rangeRound([0, height]).paddingInner(0.1); // location of each rectangle's y-axis
+    let z = d3.scaleLinear().rangeRound([0,legendLength]); // prepare for the right legend's axis
+    x.domain(d3.range(26).map(function(i){return i;}));
+	y.domain(d3.range(7).map(function(i){return i;}));
+	z.domain([maxValue,0]);
+
+	// used for show detailed information(number of commits)
+	let divTooltip = d3.select("#object2").append("div").attr("class", "toolTip");
+
+	// add rectangles into the plot
+	g.append("g")
+	.selectAll("g")
+	.data(data)
+	.enter().append("g")
+	.append("rect")
+	  .attr("class", "commit")
+	  // in order to split the working hours from the plot
+	  .attr("x", function(d) { 
+	  	let temp = d[1];
+	  	if(d[1] > 7){ temp += 1; }
+	  	if(d[1] > 18){ temp += 1; }
+	  	return x(temp); 
+	  })
+	  .attr("y", function(d) { return y(d[0]); })
+	  .attr("height", y.bandwidth())
+	  .attr("width", x.bandwidth())
+	  .attr("fill", "#d6e685") // the initial color
+	  .on("mouseover", function(d) { // show the tooltip dynamically
+	  	divTooltip.style("left", d3.event.pageX+10+"px");
+        divTooltip.style("top", d3.event.pageY-25+"px");
+        divTooltip.style("display", "inline-block");
+        let x = d3.event.pageX, y = d3.event.pageY
+        let elements = document.querySelectorAll(':hover');
+        l = elements.length
+        l = l-1
+        elementData = elements[l].__data__
+        divTooltip.html(d[2] + " commits during " +d[1]+":00 on "+ getDay(d[0]));
+      })
+      .on("mouseout", function(d) { divTooltip.style("display", "none"); });
+
+    // add the day-axis(Y-axis) into plot
+	g.append("g")
+	  .attr("transform", function(d) { return "translate(0,0)"; })
+      .selectAll("text.day")
+      .data(d3.range(7)) // a week has 7 days
+      .enter()
+      .append("text")
+      .attr("class", "day")
+      .attr("x", -10)
+      .attr("y", function(d) { return y(d)+y.bandwidth()/2+5; })
+      .attr("fill", "black")
+      .attr("text-anchor", "end")
+      .attr("font-size", "12px")
+      .text(function(d) { return getDay(d); }); // getDay(): transfer the number into string(such as 0->Sunday)
+
+    // add the hour-axis(X-axis) into plot
+    g.append("g")
+	  .attr("transform", function(d) { return "translate(0,0)"; })
+      .selectAll("text.hour")
+      .data(d3.range(26)) // one day has 24 hours and add 2 more as dividing bars
+      .enter()
+      .append("text")
+      .attr("class", "hour")
+      .attr("x", function(d) { return x(d)+x.bandwidth()/2; })
+      .attr("y", -10)
+      .attr("fill", "black")
+      .attr("text-anchor", "middle")
+      .attr("font-size", "12px")
+      .text(function(d) { // in order to split the working hour from the plot
+      	let temp = d;
+      	if(d == 8 || d == 20){ return ""; } // blank as dividing bars
+	  	if(d > 8){ temp -= 1; }
+	  	if(d > 19){ temp -= 1 }
+      	return temp + ":00"; 
+      });
+    
+    // add the texts into dividing bars
+    let text = g.append("g");
+    ((str)=>{
+    	for(let i=0;i<str.length;i++){
+    		text.append("text")
+		      .attr("x", x(8)+x.bandwidth()/2)
+		      .attr("y", y.bandwidth() + 10)
+		      .attr("dy",i+"em")
+		      .attr("fill", "#1e6823")
+		      .attr("font-weight", "bold")
+		      .attr("text-anchor", "middle")
+		      .attr("font-size", "15px")
+		      .text(str[i]);
+    	}
+    })("WORKING HOUR");
+    ((str)=>{
+    	for(let i=0;i<str.length;i++){
+    		text.append("text")
+		      .attr("x", x(20)+x.bandwidth()/2)
+		      .attr("y", y.bandwidth() + 10)
+		      .attr("dy",i+"em")
+		      .attr("fill", "#1e6823")
+		      .attr("font-weight", "bold")
+		      .attr("text-anchor", "middle")
+		      .attr("font-size", "15px")
+		      .text(str[i]);
+    	}
+    })("WORKING HOUR")
+
+    // add the legend with gradient colors
+    // initial the gradient colors
+	let linearGradient = g.append("g")
+	  .append("linearGradient")
+	  	.attr("id","linearColor")  
+	  	.attr("x1","0%")  
+        .attr("y1","100%")  
+        .attr("x2","0%")  
+        .attr("y2","0%");
+    let stop1 = linearGradient.append("stop")
+        .attr("offset","0%") 
+        .style("stop-color","#d6e685");
+    let stop2 = linearGradient.append("stop")
+        .attr("offset","100%")  
+        .style("stop-color","#1e6823");
+    let legend = g.append("g")
+    // add the legend rectangle
+	legend.append("rect")
+	  .attr("x", width + 20)
+	  .attr("y", 0)
+	  .attr("height", legendLength)
+	  .attr("width", x.bandwidth()/2)
+	  .attr("fill", "url(#" + linearGradient.attr("id") + ")");
+	// add the legend axis
+	legend.append("g")
+	  .attr("class", "axis")
+	  .attr("transform", "translate("+ (width + 20 + x.bandwidth()/2) + ",0)")
+	  .call(d3.axisRight(z).ticks(5))
+
+}
+// used to show the animation of changing different colors
+function objectTwoAnimate(data,maxValue){
+	let svg = d3.select("#object2").select("svg"),
+    	g = svg.select("g");
+
+    // used for show the different number of commits using different colors
+	let colorMap = d3.interpolateRgb(
+	  d3.rgb('#d6e685'),
+	  d3.rgb('#1e6823')
+	);
+	// add an animation
+    g.selectAll("rect.commit")
+      .data(data)
+      .transition()
+      .duration(1000)
+      .attr("fill",function(d){return colorMap(d[2]/maxValue)});
+}
+
+function drawObjectiveThree(d_data,w_data,s_data,owner){
+	// let the plot can fit different sizes of the data
+	let wholeHeight_a = Math.ceil(s_data.children.length / 15) * 600;
+	let wholeHeight_b = Math.ceil(w_data.length / 38) * 600;
+	let wholeHeight = wholeHeight_a > wholeHeight_b ? wholeHeight_a : wholeHeight_b;
+	let svg = d3.select("#object3")
+				.append("svg")
+				.attr("width",1100)
+				.attr("height",wholeHeight),
+    	margin = {top: 20, right: 80, bottom: 20, left: 80},
+    	width = +svg.attr("width") - margin.left - margin.right,
+    	height = +svg.attr("height") - margin.top - margin.bottom,
+    	radius = 250,
+    	g = svg.append("g").attr('transform', 'translate(' + (+svg.attr("width"))/2 + ',' + 300 + ')');
+
+   	// this plot needs a lot of different colors
+	let d3_category70 = [
+	0xd3fe14, 0xfec7f8, 0x0b7b3e, 0x0bf0e9, 0xc203c8, 0xfd9b39, 0x888593, 
+	0x906407, 0x98ba7f, 0xfe6794, 0x10b0ff, 0xac7bff, 0xfee7c0, 0x964c63, 
+	0x1da49c, 0x0ad811, 0xbbd9fd, 0xfe6cfe, 0x297192, 0xd1a09c, 0x78579e, 
+	0x81ffad, 0x739400, 0xca6949, 0xd9bf01, 0x646a58, 0xd5097e, 0xbb73a9, 
+	0xccf6e9, 0x9cb4b6, 0xb6a7d4, 0x9e8c62, 0x6e83c8, 0x01af64, 0xa71afd, 
+	0xcfe589, 0xd4ccd1, 0xfd4109, 0xbf8f0e, 0x2f786e, 0x4ed1a5, 0xd8bb7d, 
+	0xa54509, 0x6a9276, 0xa4777a, 0xfc12c9, 0x606f15, 0x3cc4d9, 0xf31c4e, 
+	0x73616f, 0xf097c6, 0xfc8772, 0x92a6fe, 0x875b44, 0x699ab3, 0x94bc19, 
+	0x7d5bf0, 0xd24dfe, 0xc85b74, 0x68ff57, 0xb62347, 0x994b91, 0x646b8c, 
+	0x977ab4, 0xd694fd, 0xc4d5b5, 0xfdc4bd, 0x1cae05, 0x7bd972, 0xe9700a];
+	// transfer the above color code to d3.rgb
+	function d3_rgbString (value) {
+		return d3.rgb(value >> 16, value >> 8 & 0xff, value & 0xff);
+	}
+	let color = d3.scaleOrdinal(d3_category70.map((c)=>{return d3_rgbString(c);}));
+
+	// prepare for the sunburst chart
+	let formatNumber = d3.format(",d");
+	let x = d3.scaleLinear().range([0, 2 * Math.PI]);
+	let y = d3.scaleSqrt().range([0, radius]);
+	let partition = d3.partition();
+	let arc = d3.arc()
+	    .startAngle(function(d) { return Math.max(0, Math.min(2 * Math.PI, x(d.x0))); })
+	    .endAngle(function(d) { return Math.max(0, Math.min(2 * Math.PI, x(d.x1))); })
+	    .innerRadius(function(d) { return Math.max(0, y(d.y0)); })
+	    .outerRadius(function(d) { return Math.max(0, y(d.y1)); });
+	let root = d3.hierarchy(s_data, function(d) { if(d.children){console.log(d.children.length);}return d.children; });
+	console.log(root)
+	root.sum(function(d) { return d.size; }); // calculate the size of different areas in sunburst chart
+	// add the sunburst chart
+	g.selectAll("path")
+	  .data(partition(root).descendants())
+	.enter().append("path")
+	  .attr("d", arc)
+	  .attr("fill-rule", "evenodd")
+      .style('stroke', '#fff')
+	  .style("fill", function(d) { return color(d.data.name); })
+	  .on("click", click)
+	.append("title")
+	  .text(function(d) { return d.data.name + "\nTotal bytes:" + formatNumber(d.value); });
+
+	let barLength = d3.scaleLinear().rangeRound([0,125]); // prepare for the bar chart at the left side
+	let sizeWhole = d3.sum(w_data,function(d){return d.size;});
+	barLength.domain([0, sizeWhole]).nice();
+	let w_barchart = svg.append("g"); // prepare for the parent node of bar chart
+	w_barchart.append("text").attr("x", 95).attr("y", margin.top).attr("fill", "black")
+      .attr("text-anchor", "end").attr("font-size", "15px").text("Languages") // add the title of bar chart
+	w_barchart.append("text").attr("x", 100).attr("y", margin.top).attr("fill", "black")
+      .attr("text-anchor", "start").attr("font-size", "15px").text("(Bytes / Percentage)") // add the title of bar chart
+	let barchart = w_barchart.selectAll("rect").data(w_data).enter();
+	rect_barchart = barchart.append("rect") // add the rectangles
+	  .attr("class", "barchart")
+	  .attr("x", function(d) { return 100;})
+	  .attr("y", function(d,i) { return margin.top + 10 + i * 15;})
+	  .attr("height", 12.5)
+	  .attr("width",function(d) { return barLength(d.size); })
+	  .style("fill", function(d) { return color(d.name); });
+	barchart.append("text") // add the labels at the left side of bar chart
+      .attr("x", function(d) { return 95; })
+      .attr("y", function(d,i) { return margin.top + i * 15 + 6.25 + 14;})
+      .attr("fill", "black")
+      .attr("text-anchor", "end")
+      .attr("font-size", "12px")
+	  .text(function(d) { return d.name; })
+	.append("title")
+	  .text(function(d) { return d.name; });
+	text_barchart = barchart.append("text") // add the real number and the real percent at the right side of bar chart
+      .attr("x", function(d) { return 100 + barLength(d.size) + 5; })
+      .attr("y", function(d,i) { return margin.top + i * 15 + 6.25 + 14;})
+      .attr("fill", "black")
+      .attr("text-anchor", "start")
+      .attr("font-size", "12px")
+	  .text(function(d) { return d.size + " / " + (d.size/sizeWhole * 100).toFixed(2) + "%"; });
+  	
+	let w_legend = svg.append("g") // add the parent node of legend at the right side of the plot
+	w_legend.append("text") // add the title of legend
+	  .attr("x", width)
+      .attr("y", margin.top)
+      .attr("fill", "black")
+      .attr("text-anchor", "start")
+      .attr("font-size", "15px")
+	  .text("repositories");
+	let legend = w_legend.selectAll("rect")
+	  .data(partition(root).descendants())
+	  .enter()
+	  .filter(function(d) { // just show the repositories of the owner
+	  	if(!d.parent){ return false; }
+	  	return d.parent.data.name == owner });
+	legend.append("rect") // add the rectangles of the legend
+	  .attr("x", function(d) { return width;})
+	  .attr("y", function(d,i) { return margin.top + 10 + i * 30;})
+	  .attr("height", 25)
+	  .attr("width", 25)
+	  .style("fill", function(d) { return color(d.data.name); })
+	  .on("click", click)
+	.append("title")
+	  .text(function(d) { return d.data.name + "\nTotal bytes: " + formatNumber(d.value); });
+	legend.append("text") // add the associated text(name of repository)
+      .attr("x", function(d) { return width + 10 + 12.5 + 5; })
+      .attr("y", function(d,i) { return margin.top + i * 30 + 12.5 + 14;})
+      .attr("fill", "black")
+      .attr("text-anchor", "start")
+      .attr("font-size", "12px")
+	  .text(function(d) { return d.data.name; });
+
+	function deepCopy(arr){
+		let res = new Array();
+		for(let a in arr){
+			res.push({"name":arr[a].name,"size":arr[a].size})
+		}
+		return res;
+	}
+
+	function click(d) {
+		g.transition()
+		  .duration(750)
+		  .tween("scale", function() {
+		    var xd = d3.interpolate(x.domain(), [d.x0, d.x1]),
+		        yd = d3.interpolate(y.domain(), [d.y0, 1]),
+		        yr = d3.interpolate(y.range(), [d.y0 ? 20 : 0, radius]);
+		    return function(t) { x.domain(xd(t)); y.domain(yd(t)).range(yr(t)); };
+		  })
+		.selectAll("path")
+		  .attrTween("d", function(d) { return function() { return arc(d); }; });
+		if(!d.parent){
+			let tempData = w_data;
+			sizeWhole = d3.sum(tempData,function(d){return d.size;});
+			barLength.domain([0, sizeWhole]).nice();
+			rect_barchart.data(tempData) // change the length of the rectangle
+			    .transition()
+			    .duration(1000)
+			    .attr('width', function(d) { return barLength(d.size); });
+			text_barchart.data(tempData) // change the text of the bar chart
+			    .transition()
+			    .duration(1000)
+			    .attr("x", function(d) { return 100 + barLength(d.size) + 5; })
+			    .text(function(d) { return d.size + " / " + (d.size/sizeWhole * 100).toFixed(2) + "%"; });
+		}
+		else if(d.children){
+			let tempData = deepCopy(w_data);
+			sizeWhole = 0;
+			for(let t in tempData){
+				tempData[t]['size'] = 0;
+			}
+			for(let c in d.data.children){
+				sizeWhole += d.data.children[c].size;
+				tempData[d_data[d.data.children[c].name]]['size'] = d.data.children[c].size;
+			}
+			barLength.domain([0, sizeWhole]).nice();
+			rect_barchart.data(tempData) // change the length of the rectangle
+			    .transition()
+			    .duration(1000)
+			    .attr('width', function(d) { return barLength(d.size); });
+			text_barchart.data(tempData) // change the text of the bar chart
+			    .transition()
+			    .duration(1000)
+			    .attr("x", function(d) { return 100 + barLength(d.size) + 5; })
+			    .text(function(d) { return d.size + " / " + (d.size/sizeWhole * 100).toFixed(2) + "%"; });
+		}
+		else{
+			let tempData = deepCopy(w_data);
+			sizeWhole = d.data.size;
+			for(let t in tempData){
+				tempData[t]['size'] = 0;
+			}
+			tempData[d_data[d.data.name]]['size'] = d.data.size;
+			barLength.domain([0, sizeWhole]).nice();
+			rect_barchart.data(tempData) // change the length of the rectangle
+			    .transition()
+			    .duration(1000)
+			    .attr('width', function(d) { return barLength(d.size); });
+			text_barchart.data(tempData) // change the text of the bar chart
+			    .transition()
+			    .duration(1000)
+			    .attr("x", function(d) { return 100 + barLength(d.size) + 5; })
+			    .text(function(d) { return d.size + " / " + (d.size/sizeWhole * 100).toFixed(2) + "%"; });
+		}
+	};
+
+}
+
+document.getElementById("searchBtn").onclick = function (evt) { 
+	let text = document.getElementById("text");
+	//eg. https://github.com/torvalds/linux
+	if(text.value){
+		let obj1 = document.getElementById("object1");
+		obj1.removeChild(obj1.firstChild);
+		let obj2 = document.getElementById("object2");
+		obj2.removeChild(obj2.firstChild);
+		let obj3 = document.getElementById("object3");
+		obj3.removeChild(obj3.firstChild);
+	}else{
+		return;
+	}
+	let _text = text.value.split("/");
+	let _user = _text[_text.length-2];
+	let _repo = _text[_text.length-1];
+	document.getElementById("object1_header").innerHTML = "The Weekly Commit Count ("+_user+"."+_repo+")";
+	document.getElementById("object2_header").innerHTML = "Total Commits Per Hour of Each Day ("+_user+"."+_repo+")";
+	document.getElementById("object3_header").innerHTML = "Total Bytes Count of Different Programming Languages ("+_user+")";
+	let api_1 = "https://api.github.com/repos/"+_user+"/"+_repo+"/stats/participation";
+	text.value = "";
+
+	d3.json(api_1, function(error, response) {
+    	drawObjectiveOne(response);
+	});
+
+	let data = "";
+	let isloaded = true;
+	let maxValue = 0
+	let api_2 = "https://api.github.com/repos/"+_user+"/"+_repo+"/stats/punch_card"
+	d3.json(api_2, function(error, response) {
+		data = response;
+		isloaded = false;
+		for(let i in data){
+			if(data[i][2] > maxValue){
+				maxValue = data[i][2]
+			}
+		}
+		drawObjectiveTwo(response,maxValue);
+	});
+
+	let dict = {};
+	let data_array = {};
+	data_array['name'] = _user;
+	data_array['children'] = new Array();
+	let api_3 = "https://api.github.com/users/"+_user+"/repos";
+	d3.json(api_3,function(error, response) {
+		for(let i = 0;i<response.length;i++){
+			let temp_child = {};
+			temp_child['name'] = response[i]['name'];
+			temp_child['children'] = new Array();
+			data_array['children'].push(temp_child);
+			d3.json(response[i]['languages_url'],function(err, respo) {
+				for(let key in respo){
+					if(key in dict){ dict[key] += respo[key]; }
+					else{ dict[key] = respo[key]; }
+					data_array['children'][i]['children'].push({'name':key,'size':respo[key]});
+				}
+				// after all the data loaded then turn into visualizing
+				if(i==response.length-1){
+					let data_dict = new Array();
+					let dict_dict = {};
+					for(let dd in dict){
+						data_dict.push({ "name":dd, "size":dict[dd] });
+						dict_dict[dd] = data_dict.length-1;
+					}
+					drawObjectiveThree(dict_dict,data_dict,data_array,_user);
+				}
+			})
+		}
+	});
+
+	window.onscroll = function(){
+		let bodyScrollHeight =  window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+		let windowHeight = window.innerHeight;
+		let objHeight = document.getElementById('object2').offsetTop;
+		if (!isloaded && objHeight < windowHeight  + bodyScrollHeight) {
+			isloaded = true;
+			objectTwoAnimate(data,maxValue);
+		}
+	};
+	
+};
+</script>
+</html>
